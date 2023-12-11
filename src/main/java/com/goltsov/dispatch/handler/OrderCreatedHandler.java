@@ -1,5 +1,6 @@
 package com.goltsov.dispatch.handler;
 
+import com.goltsov.dispatch.message.OrderCreated;
 import com.goltsov.dispatch.service.DispatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,7 @@ public class OrderCreatedHandler {
             topics = "order.created",
             groupId = "dispatch.order.created.consumer"
     )
-    public void listen(String payload) {
+    public void listen(OrderCreated payload) {
         log.info("Received a message. The payload is: " + payload);
 
         dispatchService.process(payload);
