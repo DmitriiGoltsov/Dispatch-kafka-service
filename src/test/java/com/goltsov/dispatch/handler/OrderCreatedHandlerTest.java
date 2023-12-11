@@ -3,11 +3,11 @@ package com.goltsov.dispatch.handler;
 import com.goltsov.dispatch.message.OrderCreated;
 import com.goltsov.dispatch.service.DispatchService;
 
+import com.goltsov.dispatch.util.TestEventData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import static com.goltsov.dispatch.util.TestEventData.buildOrderCreatedEvent;
 import static java.util.UUID.randomUUID;
 
 import static org.mockito.Mockito.mock;
@@ -27,7 +27,7 @@ class OrderCreatedHandlerTest {
 
     @Test
     void listen() {
-        OrderCreated testEvent = buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
+        OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
         handler.listen(testEvent);
         Mockito.verify(dispatchServiceMock, times(1)).process(testEvent);
     }
