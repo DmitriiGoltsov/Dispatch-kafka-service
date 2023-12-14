@@ -104,7 +104,6 @@ public class OrderDispatchIntegrationTest {
                 .until(testListener.dispatchPreparingCounter::get, equalTo(1));
         await().atMost(1, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
                 .until(testListener.orderDispatchedCounter::get, equalTo(1));
-
     }
 
     private void sendMessage(String topicName, Object data) throws Exception {
@@ -114,5 +113,4 @@ public class OrderDispatchIntegrationTest {
                 .build()).get();
 
     }
-
 }
