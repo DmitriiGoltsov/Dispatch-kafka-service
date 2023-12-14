@@ -16,5 +16,4 @@ public class OrderCreated {
     UUID orderId;
 
     String item;
-
 }
