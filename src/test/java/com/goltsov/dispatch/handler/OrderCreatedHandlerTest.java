@@ -39,7 +39,6 @@ class OrderCreatedHandlerTest {
         doThrow(new RuntimeException("Service failure")).when(dispatchServiceMock).process(testEvent);
 
         handler.listen(testEvent);
-
         verify(dispatchServiceMock, times(1)).process(testEvent);
     }
 }
