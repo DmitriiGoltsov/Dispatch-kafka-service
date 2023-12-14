@@ -1,5 +1,6 @@
 package com.goltsov.dispatch.service;
 
+import com.goltsov.dispatch.message.DispatchPreparing;
 import com.goltsov.dispatch.message.OrderCreated;
 import com.goltsov.dispatch.message.OrderDispatched;
 import com.goltsov.dispatch.util.TestEventData;
@@ -28,8 +29,6 @@ class DispatchServiceTest {
 
     private KafkaTemplate kafkaProducerMock;
 
-
-
     @BeforeEach
     void setUp() {
         kafkaProducerMock = mock(KafkaTemplate.class);
@@ -44,19 +43,21 @@ class DispatchServiceTest {
         service.process(testEvent);
         verify(kafkaProducerMock, times(1))
                 .send(eq("order.dispatched"), any(OrderDispatched.class));
+
+        verify(kafkaProducerMock, times(1))
+                .send(eq("dispatch.tracking"), any(DispatchPreparing.class));
     }
 
     @Test
-    void processProducerThrowsException() {
+    void processOrderDispatchedProducerThrowsException() {
         OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
-        doThrow(new RuntimeException("Producer failure"))
-                .when(kafkaProducerMock).send(eq("order.dispatched"), any(OrderDispatched.class));
+        when(kafkaProducerMock.send(anyString(), any(DispatchPreparing.class))).thenReturn(mock(CompletableFuture.class));
+        doThrow(new RuntimeException("Order dispatch producer failure")).when(kafkaProducerMock).send(eq("order.dispatched"), any(OrderDispatched.class));
 
         Exception exception = assertThrows(RuntimeException.class, () -> service.process(testEvent));
 
-        verify(kafkaProducerMock, times(1))
-                .send(eq("order.dispatched"), any(OrderDispatched.class));
-
-        assertEquals(exception.getMessage(), "Producer failure");
+        verify(kafkaProducerMock, times(1)).send(eq("dispatch.tracking"), any(DispatchPreparing.class));
+        verify(kafkaProducerMock, times(1)).send(eq("order.dispatched"), any(OrderDispatched.class));
+        assertEquals(exception.getMessage(), "Order dispatch producer failure");
     }
 }
