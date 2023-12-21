@@ -1,17 +1,22 @@
 package com.goltsov.dispatch.integration;
 
 import com.goltsov.dispatch.DispatchConfiguration;
+import com.goltsov.dispatch.message.DispatchCompleted;
 import com.goltsov.dispatch.message.DispatchPreparing;
 import com.goltsov.dispatch.message.OrderCreated;
 import com.goltsov.dispatch.message.OrderDispatched;
 import com.goltsov.dispatch.util.TestEventData;
+
 import lombok.extern.slf4j.Slf4j;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.annotation.KafkaHandler;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -67,11 +72,15 @@ public class OrderDispatchIntegrationTest {
         }
     }
 
+    @KafkaListener(groupId = "KafkaIntegrationTest", topics = { DISPATCH_TRACKING_TOPIC, ORDER_DISPATCHED_TOPIC })
     public static class KafkaTestListener {
         AtomicInteger dispatchPreparingCounter = new AtomicInteger(0);
+
         AtomicInteger orderDispatchedCounter = new AtomicInteger(0);
 
-        @KafkaListener(groupId = "KafkaIntegrationTest", topics = DISPATCH_TRACKING_TOPIC)
+        AtomicInteger dispatchCompletedCounter = new AtomicInteger(0);
+
+        @KafkaHandler
         void receivedDispatchPreparing(@Header(KafkaHeaders.RECEIVED_KEY) String key,
                                        @Payload DispatchPreparing payload) {
             log.debug("Received DispatchPreparing: key: " + key + ". Payload: " + payload);
@@ -82,7 +91,7 @@ public class OrderDispatchIntegrationTest {
             dispatchPreparingCounter.incrementAndGet();
         }
 
-        @KafkaListener(groupId = "KafkaIntegrationTest", topics = ORDER_DISPATCHED_TOPIC)
+        @KafkaHandler
         void receivedOrderDispatch(@Header(KafkaHeaders.RECEIVED_KEY) String key,
                                    @Payload OrderDispatched payload) {
             log.debug("Received OrderDispatched: key: " + key + ". Payload: " + payload);
@@ -92,15 +101,28 @@ public class OrderDispatchIntegrationTest {
 
             orderDispatchedCounter.incrementAndGet();
         }
+
+        @KafkaHandler
+        void receivedDispatchCompleted(@Header(KafkaHeaders.RECEIVED_KEY) String key,
+                                       @Payload DispatchCompleted payload) {
+            log.debug("Received Dispatch completed message. Key: " + key + ". Payload: " + payload);
+
+            assertNotNull(key);
+            assertNotNull(payload);
+
+            dispatchCompletedCounter.incrementAndGet();
+        }
     }
 
     @BeforeEach
     public void setUp() {
         testListener.dispatchPreparingCounter.set(0);
         testListener.orderDispatchedCounter.set(0);
+        testListener.dispatchCompletedCounter.set(0);
 
-        registry.getListenerContainers().stream().forEach(container ->
-                ContainerTestUtils.waitForAssignment(container, embeddedKafkaBroker.getPartitionsPerTopic()));
+        registry.getListenerContainers().stream()
+                .forEach(container -> ContainerTestUtils.waitForAssignment(container,
+                        container.getContainerProperties().getTopics().length * embeddedKafkaBroker.getPartitionsPerTopic()));
     }
 
 
@@ -115,6 +137,8 @@ public class OrderDispatchIntegrationTest {
                 .until(testListener.dispatchPreparingCounter::get, equalTo(1));
         await().atMost(1, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
                 .until(testListener.orderDispatchedCounter::get, equalTo(1));
+        await().atMost(1, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
+                .until(testListener.dispatchCompletedCounter::get, equalTo(1));
     }
 
     private void sendMessage(String topicName, String key, Object data) throws Exception {
