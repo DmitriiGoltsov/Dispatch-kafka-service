@@ -1,5 +1,6 @@
 package com.goltsov.dispatch.service;
 
+import com.goltsov.dispatch.message.DispatchCompleted;
 import com.goltsov.dispatch.message.DispatchPreparing;
 import com.goltsov.dispatch.message.OrderCreated;
 import com.goltsov.dispatch.message.OrderDispatched;
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Service
@@ -38,6 +40,13 @@ public class DispatchService {
                 .notes("Dispatched: " + orderCreated.getItem())
                 .build();
         kafkaProducer.send(ORDER_DISPATCHED_TOPIC, key, orderDispatched).get();
+
+        DispatchCompleted dispatchCompleted = DispatchCompleted.builder()
+                .orderId(orderDispatched.getOrderId())
+                .date(LocalDate.now().toString())
+                .build();
+
+        kafkaProducer.send(DISPATCH_TRACKING_TOPIC, key, dispatchCompleted).get();
 
         log.info("Sent messages: key: " + key + ", orderId: "
                 + orderCreated.getOrderId() + " processedById: " + APPLICATION_ID);
