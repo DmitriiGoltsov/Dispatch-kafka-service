@@ -1,5 +1,7 @@
 package com.goltsov.dispatch;
 
+import com.goltsov.dispatch.exception.NotRetryableException;
+import com.goltsov.dispatch.exception.RetryableException;
 import com.goltsov.dispatch.message.OrderCreated;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -17,9 +19,11 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
@@ -37,6 +41,12 @@ public class DispatchConfiguration {
                 new ConcurrentKafkaListenerContainerFactory<>();
 
         factory.setConsumerFactory(consumerFactory);
+        // establish that there will be 3 attempts with an interval of 100 millisecond
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(new FixedBackOff(100L, 3L));
+        errorHandler.addRetryableExceptions(RetryableException.class);
+        errorHandler.addNotRetryableExceptions(NotRetryableException.class);
+        factory.setCommonErrorHandler(errorHandler);
+
 
         return factory;
     }
