@@ -20,7 +20,8 @@ public class StockServiceClient {
 
     private final String stockServiceEndpoint;
 
-    public StockServiceClient(@Autowired RestTemplate restTemplate, @Value("${dispatch.stockServiceEndpoint}") String stockServiceEndpoint) {
+    public StockServiceClient(@Autowired RestTemplate restTemplate,
+                              @Value("${dispatch.stockServiceEndpoint}") String stockServiceEndpoint) {
         this.restTemplate = restTemplate;
         this.stockServiceEndpoint = stockServiceEndpoint;
     }
