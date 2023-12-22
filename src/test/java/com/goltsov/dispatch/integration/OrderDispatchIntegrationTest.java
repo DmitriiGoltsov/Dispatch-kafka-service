@@ -45,16 +45,18 @@ import static org.awaitility.Awaitility.await;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Slf4j
 @SpringBootTest(classes = {DispatchConfiguration.class})
-@AutoConfigureWireMock(port=0)
+@AutoConfigureWireMock(port = 0)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("test")
 @EmbeddedKafka(controlledShutdown = true)
 public class OrderDispatchIntegrationTest {
 
     private final static String ORDER_CREATED_TOPIC = "order.created";
+    private final static String ORDER_CREATED_DLT_TOPIC = "order.created.DLT";
     private final static String ORDER_DISPATCHED_TOPIC = "order.dispatched";
     private final static String DISPATCH_TRACKING_TOPIC = "dispatch.tracking";
 
@@ -82,11 +84,18 @@ public class OrderDispatchIntegrationTest {
     /**
      * Use this receiver to consume messages from the outbound topics.
      */
-    @KafkaListener(groupId = "KafkaIntegrationTest", topics = { DISPATCH_TRACKING_TOPIC, ORDER_DISPATCHED_TOPIC })
+    @KafkaListener(groupId = "KafkaIntegrationTest", topics = {
+            DISPATCH_TRACKING_TOPIC,
+            ORDER_DISPATCHED_TOPIC,
+            ORDER_CREATED_DLT_TOPIC })
     public static class KafkaTestListener {
         AtomicInteger dispatchPreparingCounter = new AtomicInteger(0);
+
         AtomicInteger orderDispatchedCounter = new AtomicInteger(0);
+
         AtomicInteger dispatchCompletedCounter = new AtomicInteger(0);
+
+        AtomicInteger orderCreatedDLTCounter = new AtomicInteger(0);
 
         @KafkaHandler
         void receiveDispatchPreparing(@Header(KafkaHeaders.RECEIVED_KEY) String key, @Payload DispatchPreparing payload) {
@@ -111,6 +120,14 @@ public class OrderDispatchIntegrationTest {
             assertThat(payload, notNullValue());
             dispatchCompletedCounter.incrementAndGet();
         }
+
+        @KafkaHandler
+        void receiveOrderCreatedDLT(@Header(KafkaHeaders.RECEIVED_KEY) String key, @Payload OrderCreated payload) {
+            log.debug("Received OrderCreated DLT. Key: " + key + " - payload: " + payload);
+            assertThat(key, notNullValue());
+            assertThat(payload, notNullValue());
+            orderCreatedDLTCounter.incrementAndGet();
+        }
     }
 
     @BeforeEach
@@ -118,6 +135,7 @@ public class OrderDispatchIntegrationTest {
         testListener.dispatchPreparingCounter.set(0);
         testListener.orderDispatchedCounter.set(0);
         testListener.dispatchCompletedCounter.set(0);
+        testListener.orderCreatedDLTCounter.set(0);
 
         WiremockUtils.reset();
 
@@ -134,7 +152,7 @@ public class OrderDispatchIntegrationTest {
      * is stubbed to return a 200 Success.
      */
     @Test
-    public void testOrderDispatchFlow_Success() throws Exception {
+    public void testOrderDispatchFlowSuccess() throws Exception {
         stubWiremock("/api/stock?item=my-item", 200, "true");
 
         OrderCreated orderCreated = TestEventData.buildOrderCreatedEvent(randomUUID(), "my-item");
@@ -146,6 +164,7 @@ public class OrderDispatchIntegrationTest {
                 .until(testListener.orderDispatchedCounter::get, equalTo(1));
         await().atMost(1, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
                 .until(testListener.dispatchCompletedCounter::get, equalTo(1));
+        assertEquals(testListener.orderCreatedDLTCounter.get(), 0);
     }
 
     /**
@@ -153,13 +172,14 @@ public class OrderDispatchIntegrationTest {
      * being thrown, so the outbound events are never sent.
      */
     @Test
-    public void testOrderDispatchFlow_NotRetryableException() throws Exception {
+    public void testOrderDispatchFlowNotRetryableException() throws Exception {
         stubWiremock("/api/stock?item=my-item", 400, "Bad Request");
 
         OrderCreated orderCreated = TestEventData.buildOrderCreatedEvent(randomUUID(), "my-item");
         sendMessage(ORDER_CREATED_TOPIC, randomUUID().toString(), orderCreated);
 
-        TimeUnit.SECONDS.sleep(3);
+        await().atMost(3, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
+                .until(testListener.orderCreatedDLTCounter::get, equalTo(1));
         assertThat(testListener.dispatchPreparingCounter.get(), equalTo(0));
         assertThat(testListener.orderDispatchedCounter.get(), equalTo(0));
         assertThat(testListener.dispatchCompletedCounter.get(), equalTo(0));
@@ -171,9 +191,11 @@ public class OrderDispatchIntegrationTest {
      * are sent.
      */
     @Test
-    public void testOrderDispatchFlow_RetryThenSuccess() throws Exception {
-        stubWiremock("/api/stock?item=my-item", 503, "Service unavailable", "failOnce", STARTED, "succeedNextTime");
-        stubWiremock("/api/stock?item=my-item", 200, "true", "failOnce", "succeedNextTime", "succeedNextTime");
+    public void testOrderDispatchFlowRetryThenSuccess() throws Exception {
+        stubWiremock("/api/stock?item=my-item", 503, "Service unavailable",
+                "failOnce", STARTED, "succeedNextTime");
+        stubWiremock("/api/stock?item=my-item", 200, "true",
+                "failOnce", "succeedNextTime", "succeedNextTime");
 
         OrderCreated orderCreated = TestEventData.buildOrderCreatedEvent(randomUUID(), "my-item");
         sendMessage(ORDER_CREATED_TOPIC, randomUUID().toString(), orderCreated);
@@ -184,6 +206,21 @@ public class OrderDispatchIntegrationTest {
                 .until(testListener.orderDispatchedCounter::get, equalTo(1));
         await().atMost(1, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
                 .until(testListener.dispatchCompletedCounter::get, equalTo(1));
+        assertEquals(testListener.orderCreatedDLTCounter.get(), 0);
+    }
+
+    @Test
+    public void testOrderDispatchFlowRetryUntilFailure() throws Exception {
+        stubWiremock("/api/stock?item=my-item", 503, "Service unavailable");
+
+        OrderCreated orderCreated = TestEventData.buildOrderCreatedEvent(randomUUID(), "my-item");
+        sendMessage(ORDER_CREATED_TOPIC, randomUUID().toString(), orderCreated);
+
+        await().atMost(5, TimeUnit.SECONDS).pollDelay(100, TimeUnit.MILLISECONDS)
+                .until(testListener.orderCreatedDLTCounter::get, equalTo(1));
+        assertThat(testListener.dispatchPreparingCounter.get(), equalTo(0));
+        assertThat(testListener.orderDispatchedCounter.get(), equalTo(0));
+        assertThat(testListener.dispatchCompletedCounter.get(), equalTo(0));
     }
 
     private void sendMessage(String topic, String key, Object data) throws Exception {
