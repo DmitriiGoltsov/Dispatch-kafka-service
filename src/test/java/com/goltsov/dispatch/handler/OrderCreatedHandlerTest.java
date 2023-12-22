@@ -1,15 +1,20 @@
 package com.goltsov.dispatch.handler;
 
+import com.goltsov.dispatch.exception.NotRetryableException;
+import com.goltsov.dispatch.exception.RetryableException;
 import com.goltsov.dispatch.message.OrderCreated;
 import com.goltsov.dispatch.service.DispatchService;
-
 import com.goltsov.dispatch.util.TestEventData;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
-
 import static java.util.UUID.randomUUID;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -19,7 +24,6 @@ import static org.mockito.Mockito.verify;
 class OrderCreatedHandlerTest {
 
     private OrderCreatedHandler handler;
-
     private DispatchService dispatchServiceMock;
 
     @BeforeEach
@@ -29,20 +33,32 @@ class OrderCreatedHandlerTest {
     }
 
     @Test
-    void listenSuccess() throws Exception {
-        String key = UUID.randomUUID().toString();
+    void listen_Success() throws Exception {
+        String key = randomUUID().toString();
         OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
         handler.listen(0, key, testEvent);
         verify(dispatchServiceMock, times(1)).process(key, testEvent);
     }
 
     @Test
-    public void listenServiceThrowsException() throws Exception {
-        String key = UUID.randomUUID().toString();
+    public void listen_ServiceThrowsException() throws Exception {
+        String key = randomUUID().toString();
         OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
         doThrow(new RuntimeException("Service failure")).when(dispatchServiceMock).process(key, testEvent);
 
-        handler.listen(0, key, testEvent);
+        Exception exception = assertThrows(NotRetryableException.class, () -> handler.listen(0, key, testEvent));
+        assertThat(exception.getMessage(), equalTo("java.lang.RuntimeException: Service failure"));
+        verify(dispatchServiceMock, times(1)).process(key, testEvent);
+    }
+
+    @Test
+    public void testListen_ServiceThrowsRetryableException() throws Exception {
+        String key = randomUUID().toString();
+        OrderCreated testEvent = TestEventData.buildOrderCreatedEvent(randomUUID(), randomUUID().toString());
+        doThrow(new RetryableException("Service failure")).when(dispatchServiceMock).process(key, testEvent);
+
+        Exception exception = assertThrows(RuntimeException.class, () -> handler.listen(0, key, testEvent));
+        assertThat(exception.getMessage(), equalTo("Service failure"));
         verify(dispatchServiceMock, times(1)).process(key, testEvent);
     }
 }
