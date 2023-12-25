@@ -8,6 +8,7 @@
 		<version>3.1.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
+
 	<groupId>com.goltsov</groupId>
 	<artifactId>dispatch</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
@@ -66,6 +67,12 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>10.12.6</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -84,5 +91,18 @@
             </plugin>
         </plugins>
     </build>
+
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <configLocation>checkstyle.xml</configLocation>
+                </configuration>
+            </plugin>
+        </plugins>
+    </reporting>
 
 </project>
