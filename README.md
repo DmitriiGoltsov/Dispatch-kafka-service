@@ -13,3 +13,24 @@ The code is tested with unit and integration test written with JUnit 5 and Mocki
 + Apache Maven
 + JUnit 5 & Mockito
 + Others
+
+## Requirements
+
+1) Apache Kafka 2.13-3.6.1+
+
+## How to run
+
+1) Download the app with `git clone` command;
+2) Run Kafka installed on your system;
+3) Run Consumer and Producer with similar commands (bootstrap-server and other properties may vary):
+```
+./bin/kafka-console-consumer.sh --topic order.dispatched --bootstrap-server localhost:9092 --property print.key=true --property key.separator=:
+```
+and 
+```
+./bin/kafka-console-producer.sh --topic order.created --bootstrap-server localhost:9092 --property parse.key=true --property key.separator=:  
+```
+4) Run the app with this command: `mvn spring-boot:run`;
+5) Test the app with CLI.
+
+
