@@ -13,5 +13,5 @@ import java.util.UUID;
 @Builder
 public class DispatchPreparing {
 
-    UUID orderId;
+    private UUID orderId;
 }

@@ -13,7 +13,7 @@ import java.util.UUID;
 @Builder
 public class OrderCreated {
 
-    UUID orderId;
+    private UUID orderId;
 
-    String item;
+    private String item;
 }

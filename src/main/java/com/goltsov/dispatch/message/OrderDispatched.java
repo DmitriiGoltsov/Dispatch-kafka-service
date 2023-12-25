@@ -13,10 +13,10 @@ import java.util.UUID;
 @Builder
 public class OrderDispatched {
 
-    UUID orderId;
+    private UUID orderId;
 
-    UUID processedBy;
+    private UUID processedBy;
 
-    String notes;
+    private String notes;
 
 }

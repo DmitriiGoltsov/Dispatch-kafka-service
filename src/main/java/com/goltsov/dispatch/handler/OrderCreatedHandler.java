@@ -27,8 +27,11 @@ public class OrderCreatedHandler {
             groupId = "dispatch.order.created.consumer",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void listen(@Header(KafkaHeaders.RECEIVED_PARTITION) Integer partition, @Header(KafkaHeaders.RECEIVED_KEY) String key, @Payload OrderCreated payload) {
-        log.info("Received message: partition: "+partition+" - key: " +key+ " - orderId: " + payload.getOrderId() + " - item: " + payload.getItem());
+    public void listen(@Header(KafkaHeaders.RECEIVED_PARTITION) Integer partition,
+                       @Header(KafkaHeaders.RECEIVED_KEY) String key,
+                       @Payload OrderCreated payload) {
+        log.info("Received message: partition: " + partition + " - key: " + key + " - orderId: "
+                + payload.getOrderId() + " - item: " + payload.getItem());
         try {
             dispatchService.process(key, payload);
         } catch (RetryableException e) {

@@ -32,7 +32,7 @@ public class DispatchService {
 
         String available = stockServiceClient.checkAvailability(orderCreated.getItem());
 
-        if(Boolean.parseBoolean(available)) {
+        if (Boolean.parseBoolean(available)) {
             DispatchPreparing dispatchPreparing = DispatchPreparing.builder()
                     .orderId(orderCreated.getOrderId())
                     .build();
@@ -51,7 +51,8 @@ public class DispatchService {
                     .build();
             kafkaProducer.send(DISPATCH_TRACKING_TOPIC, key, dispatchCompleted).get();
 
-            log.info("Sent messages: key: " + key + " - orderId: " + orderCreated.getOrderId() + " - processedById: " + APPLICATION_ID);
+            log.info("Sent messages: key: " + key + " - orderId: " + orderCreated.getOrderId()
+                    + " - processedById: " + APPLICATION_ID);
         } else {
             log.info("Item " + orderCreated.getItem() + " is unavailable.");
         }

@@ -51,7 +51,6 @@ public class DispatchConfiguration {
         errorHandler.addNotRetryableExceptions(NotRetryableException.class);
         factory.setCommonErrorHandler(errorHandler);
 
-
         return factory;
     }
 

@@ -31,7 +31,8 @@ public class StockServiceClient {
      */
     public String checkAvailability(String item) {
         try {
-            ResponseEntity<String> response = restTemplate.getForEntity(stockServiceEndpoint+"?item="+item, String.class);
+            ResponseEntity<String> response =
+                    restTemplate.getForEntity(stockServiceEndpoint + "?item=" + item, String.class);
             if (!response.getStatusCode().is2xxSuccessful()) {
                 throw new RuntimeException("error " + response.getStatusCode().value());
             }
